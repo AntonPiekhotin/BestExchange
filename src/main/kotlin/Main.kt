@@ -1,5 +1,6 @@
 package com.tony
 
+import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -19,7 +20,12 @@ internal const val UAH_CURRENCY_CODE = 980
 internal const val EUR_CURRENCY_CODE = 978
 internal const val USD_CURRENCY_CODE = 840
 
-class MyBot : TelegramLongPollingBot() {
+private const val ONE_HOUR = 60 * 60 * 1000L
+private const val HALF_HOUR = 30 * 60 * 1000L
+private const val THREE_HOUR = 3 * 60 * 60 * 1000L
+private const val FIVE_MIN = 5 * 60 * 1000L
+
+class BestExchangeBot : TelegramLongPollingBot() {
 
     private val objectMapper = ObjectMapper()
 
@@ -36,8 +42,8 @@ class MyBot : TelegramLongPollingBot() {
         GlobalScope.launch {
             while (isActive) {
                 val rate = getEurUahRate()
-                execute(SendMessage(MY_CHAT_ID, "Поточний курс USD: $rate"))
-                delay(3 * 60 * 60 * 1000L) // кожні 3 години
+                execute(SendMessage(MY_CHAT_ID, rate.toString()))
+                delay(FIVE_MIN)
             }
         }
     }
@@ -55,8 +61,8 @@ class MyBot : TelegramLongPollingBot() {
                 "N/A"
             )
 
-            val responseBody = objectMapper.readValue(body, MonoCurrencyResponse::class.java)
-            val eurToUah = responseBody.currencies.firstOrNull {
+            val responseBody = objectMapper.readValue(body, object : TypeReference<List<MonoCurrencyResponse>>() {})
+            val eurToUah = responseBody.firstOrNull {
                 it.currencyCodeA == EUR_CURRENCY_CODE && it.currencyCodeB == UAH_CURRENCY_CODE
             }
             return if (eurToUah != null) {
@@ -67,7 +73,6 @@ class MyBot : TelegramLongPollingBot() {
                 )
             } else {
                 TelegramMessage("No EUR/UAH rate found", "N/A", "N/A")
-
             }
         }
     }
@@ -75,7 +80,7 @@ class MyBot : TelegramLongPollingBot() {
 
 fun main() {
     val botsApi = TelegramBotsApi(DefaultBotSession::class.java)
-    val bot = MyBot()
+    val bot = BestExchangeBot()
     botsApi.registerBot(bot)
     bot.startSendingRates()
 }
