@@ -53,24 +53,28 @@ class BestExchangeBot : TelegramLongPollingBot() {
         delay(millisToNoon)
         val msg = getEurUahRateFromMonobankApi()
         logInfo("Sending daily rate at noon: $msg")
-        execute(SendMessage(MY_CHAT_ID, "Щоденний курс EUR/UAH\n$msg"))
+        execute(SendMessage(MY_CHAT_ID, "Daily EUR/UAH\n$msg"))
     }
 
     private fun significantChanges() {
         println("========================================================================")
         logInfo("Checking for rate update...")
-        val rate = webClient.getEurUahRateValue().rateBuy
-        if (rate != null) {
-            logInfo("Current EUR/UAH rate: $rate")
+        val uahEur = webClient.getEurUahRateValue()
+        if (uahEur.rateBuy != null) {
+            logInfo("Current EUR/UAH rate: ${uahEur.rateBuy}")
             logInfo("current last rates: $lastRates")
-            if (shouldSendRate(rate)) {
-                val msg = getEurUahRateFromMonobankApi()
+            if (shouldSendRate(uahEur.rateBuy)) {
+                val msg = TelegramMessage(
+                    "EUR/UAH",
+                    uahEur.rateSell.toString(),
+                    uahEur.rateBuy.toString()
+                )
                 logInfo("Significant rate change detected. Sending update: $msg")
                 execute(SendMessage(MY_CHAT_ID, "Significant rate change: \n$msg"))
             } else {
                 logInfo("No significant rate change. Not sending update.")
             }
-            addRate(rate)
+            addRate(uahEur.rateBuy)
         }
     }
 
@@ -99,8 +103,8 @@ class BestExchangeBot : TelegramLongPollingBot() {
         val apiResponse = webClient.getEurUahRateValue()
         return TelegramMessage(
             "EUR/UAH",
-            String.format("Sell:", apiResponse.rateSell ?: 0.0),
-            String.format("Buy:", apiResponse.rateBuy ?: 0.0)
+            apiResponse.rateSell.toString(),
+            apiResponse.rateBuy.toString()
         )
     }
 }

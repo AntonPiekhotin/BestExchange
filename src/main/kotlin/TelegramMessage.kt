@@ -6,6 +6,6 @@ data class TelegramMessage(
     val buyRate: String
 ) {
     override fun toString(): String {
-        return "$message\nКурс продажу: $sellRate\nКурс купівлі: $buyRate"
+        return "$message\nSell rate: $sellRate\nBuy rate: $buyRate"
     }
 }
