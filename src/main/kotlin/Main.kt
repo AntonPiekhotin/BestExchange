@@ -24,7 +24,9 @@ class BestExchangeBot : TelegramLongPollingBot() {
     private val webClient = WebClient
     private val lastRates = ArrayDeque<Double>(15)
 
-    override fun getBotToken(): String = "8128343370:AAEtN2E6fAkWQmnBywFrHF_Xrj1oRQanA28"
+    override fun getBotToken(): String =
+        System.getenv("TELEGRAM_BOT_TOKEN") ?: throw Exception("No TELEGRAM_BOT_TOKEN env set")
+
     override fun getBotUsername(): String = "BestExchange"
 
     override fun onUpdateReceived(update: Update?) {
