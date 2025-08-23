@@ -9,19 +9,7 @@ internal const val UAH_CURRENCY_CODE = 980
 internal const val EUR_CURRENCY_CODE = 978
 private const val MONOBANK_API_URL = "https://api.monobank.ua/bank/currency"
 
-class WebClient {
-
-    private constructor()
-
-    companion object {
-        lateinit var instance: WebClient
-            private set
-    }
-
-    init {
-        instance = WebClient()
-    }
-
+object WebClient {
     private val objectMapper = ObjectMapper()
 
     fun getEurUahRateValue(): MonoCurrencyResponse {

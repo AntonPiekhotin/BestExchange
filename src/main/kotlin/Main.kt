@@ -21,7 +21,7 @@ private const val RATE_CHANGE_THRESHOLD = 0.2
 
 class BestExchangeBot : TelegramLongPollingBot() {
 
-    private val webClient = WebClient.instance
+    private val webClient = WebClient
     private val lastRates = ArrayDeque<Double>(15)
 
     override fun getBotToken(): String = "8128343370:AAEtN2E6fAkWQmnBywFrHF_Xrj1oRQanA28"
