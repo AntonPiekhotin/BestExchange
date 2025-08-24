@@ -1,9 +1,6 @@
 package com.tony
 
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import it.sauronsoftware.cron4j.Scheduler
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.TelegramBotsApi
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
@@ -12,17 +9,13 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
 
 internal const val MY_CHAT_ID = "770129748"
 
-private const val ONE_HOUR = 60 * 60 * 1000L
-private const val HALF_HOUR = 30 * 60 * 1000L
-private const val THREE_HOUR = 3 * 60 * 60 * 1000L
-private const val FIVE_MIN = 5 * 60 * 1000L
-
 private const val RATE_CHANGE_THRESHOLD = 0.2
 
 class BestExchangeBot : TelegramLongPollingBot() {
 
     private val webClient = WebClient
     private val lastRates = ArrayDeque<Double>(15)
+    private val scheduler = Scheduler()
 
     override fun getBotToken(): String =
         System.getenv("TELEGRAM_BOT_TOKEN") ?: throw Exception("No TELEGRAM_BOT_TOKEN env set")
@@ -36,23 +29,34 @@ class BestExchangeBot : TelegramLongPollingBot() {
     }
 
     fun startSendingRates() {
-        GlobalScope.launch {
-            while (isActive) {
+        // Run once at startup to initialize lastRates quietly
+        try {
+            significantChanges()
+        } catch (t: Throwable) {
+            logError("Startup significantChanges error: ${t.message}")
+        }
+
+        // Every 3 hours at minute 0
+        scheduler.schedule("0 */3 * * *") {
+            try {
                 significantChanges()
-                delay(THREE_HOUR)
+            } catch (t: Throwable) {
+                logError("Scheduled significantChanges error: ${t.message}")
             }
         }
-        GlobalScope.launch {
-            while (isActive) {
-                dailyUpdate()
-                delay(ONE_HOUR)
+        // Every day at 13:00 local time
+        scheduler.schedule("0 13 * * *") {
+            try {
+                sendDailyRate()
+            } catch (t: Throwable) {
+                logError("Scheduled daily update error: ${t.message}")
             }
         }
+        scheduler.start()
+        logInfo("Schedulers started: 3-hourly checks and daily noon update")
     }
 
-    private suspend fun dailyUpdate() {
-        val millisToNoon = millisUntilNextNoon()
-        delay(millisToNoon)
+    private fun sendDailyRate() {
         val msg = getEurUahRateFromMonobankApi()
         logInfo("Sending daily rate at noon: $msg")
         execute(SendMessage(MY_CHAT_ID, "Daily EUR/UAH\n$msg"))
