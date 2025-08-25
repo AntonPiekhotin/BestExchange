@@ -87,8 +87,8 @@ class BestExchangeBot : TelegramLongPollingBot() {
                 logError("Scheduled significantChanges error: ${t.message}")
             }
         }
-        // Every day at 16:00 local time (19:00 Kyiv time)
-        dailyTaskId = scheduler.schedule("0 $dailyUpdateHour $dailyUpdateMinute * * *") {
+        // Every day at configured time
+        dailyTaskId = scheduler.schedule("$dailyUpdateMinute $dailyUpdateHour * * *") {
             try {
                 sendDailyRate()
             } catch (t: Throwable) {
