@@ -7,8 +7,8 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.api.objects.Update
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
 import java.io.File
-import java.io.FileWriter
 import java.io.FileReader
+import java.io.FileWriter
 import java.util.Properties
 
 internal const val MY_CHAT_ID = "770129748"
@@ -19,8 +19,13 @@ private const val SETTINGS_FILE = "bot_settings.properties"
 class BestExchangeBot : TelegramLongPollingBot() {
 
     private val webClient = WebClient
-    private val lastRates = ArrayDeque<Double>(15)
     private val scheduler = Scheduler()
+
+    private var lastSentRate: Double = 0.0
+        set(value) {
+            logDebug("Updating lastSentRate: $value (was $field)")
+            field = value
+        }
     private var dailyTaskId: String? = null
     private var dailyUpdateHour: Int = 16  // Default 16:00 (19:00 Kyiv time)
     private var dailyUpdateMinute: Int = 0
@@ -101,8 +106,9 @@ class BestExchangeBot : TelegramLongPollingBot() {
 
     private fun sendDailyRate() {
         val msg = getEurUahRateFromMonobankApi()
-        logInfo("Sending daily rate at noon: $msg")
-        execute(SendMessage(MY_CHAT_ID, "Daily EUR/UAH\n$msg"))
+        logInfo("Sending daily rate: $msg")
+        execute(SendMessage(MY_CHAT_ID, msg.toString()))
+        lastSentRate = msg.buyRate.toDouble()
     }
 
     private fun significantChanges() {
@@ -111,7 +117,6 @@ class BestExchangeBot : TelegramLongPollingBot() {
         val uahEur = webClient.getEurUahRateValue()
         if (uahEur.rateBuy != null) {
             logInfo("Current EUR/UAH rate: ${uahEur.rateBuy}")
-            logInfo("current last rates: $lastRates")
             if (shouldSendRate(uahEur.rateBuy)) {
                 val msg = TelegramMessage(
                     "EUR/UAH",
@@ -120,21 +125,15 @@ class BestExchangeBot : TelegramLongPollingBot() {
                 )
                 logInfo("Significant rate change detected. Sending update: $msg")
                 execute(SendMessage(MY_CHAT_ID, "Significant rate change: \n$msg"))
+                lastSentRate = uahEur.rateBuy
             } else {
                 logInfo("No significant rate change. Not sending update.")
             }
-            addRate(uahEur.rateBuy)
         }
     }
 
-    private fun addRate(rate: Double) {
-        if (lastRates.size == 15) lastRates.removeFirst()
-        lastRates.addLast(rate)
-    }
-
     private fun shouldSendRate(newRate: Double): Boolean {
-        val last = lastRates.lastOrNull() ?: return true
-        return kotlin.math.abs(newRate - last) > RATE_CHANGE_THRESHOLD
+        return kotlin.math.abs(newRate - lastSentRate) > RATE_CHANGE_THRESHOLD
     }
 
     fun getEurUahRateFromMonobankApi(): TelegramMessage {
@@ -187,7 +186,12 @@ class BestExchangeBot : TelegramLongPollingBot() {
             val minute = minuteStr.toIntOrNull()
 
             if (hour == null || minute == null || hour !in 0..23 || minute !in 0..59) {
-                execute(SendMessage(MY_CHAT_ID, "Невірний формат часу. Використовуйте формат HH:MM (24-годинний формат)."))
+                execute(
+                    SendMessage(
+                        MY_CHAT_ID,
+                        "Невірний формат часу. Використовуйте формат HH:MM (24-годинний формат)."
+                    )
+                )
                 return
             }
 
@@ -205,7 +209,12 @@ class BestExchangeBot : TelegramLongPollingBot() {
                 }
             }
 
-            execute(SendMessage(MY_CHAT_ID, "Час щоденного оновлення змінено на ${String.format("%02d:%02d", hour, minute)}."))
+            execute(
+                SendMessage(
+                    MY_CHAT_ID,
+                    "Час щоденного оновлення змінено на ${String.format("%02d:%02d", hour, minute)}."
+                )
+            )
         } catch (e: Exception) {
             execute(SendMessage(MY_CHAT_ID, "Помилка при обробці команди: ${e.message}"))
         }
