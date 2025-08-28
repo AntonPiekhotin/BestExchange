@@ -13,21 +13,20 @@ import java.util.Properties
 
 internal const val MY_CHAT_ID = "770129748"
 
-private const val RATE_CHANGE_THRESHOLD = 0.2
+private const val RATE_CHANGE_THRESHOLD = 0.1
 private const val SETTINGS_FILE = "bot_settings.properties"
 
 class BestExchangeBot : TelegramLongPollingBot() {
 
     private val webClient = WebClient
     private val scheduler = Scheduler()
-
     private var lastSentRate: Double = 0.0
         set(value) {
             logDebug("Updating lastSentRate: $value (was $field)")
             field = value
         }
     private var dailyTaskId: String? = null
-    private var dailyUpdateHour: Int = 16  // Default 16:00 (19:00 Kyiv time)
+    private var dailyUpdateHour: Int = 17
     private var dailyUpdateMinute: Int = 0
 
     init {
@@ -43,9 +42,7 @@ class BestExchangeBot : TelegramLongPollingBot() {
         val message = update?.message
         val text = message?.text
         val chatId = message?.chatId?.toString()
-
         if (chatId != MY_CHAT_ID) return // Only respond to authorized user
-
         when {
             text == "/start" -> {
                 execute(SendMessage(MY_CHAT_ID, "Бот запущений!"))
@@ -83,9 +80,8 @@ class BestExchangeBot : TelegramLongPollingBot() {
         } catch (t: Throwable) {
             logError("Startup significantChanges error: ${t.message}")
         }
-
-        // Every 3 hours at minute 0
-        scheduler.schedule("0 */3 * * *") {
+        // Every hour at minute 0
+        scheduler.schedule("0 */1 * * *") {
             try {
                 significantChanges()
             } catch (t: Throwable) {
@@ -124,7 +120,8 @@ class BestExchangeBot : TelegramLongPollingBot() {
                     uahEur.rateBuy.toString()
                 )
                 logInfo("Significant rate change detected. Sending update: $msg")
-                execute(SendMessage(MY_CHAT_ID, "Significant rate change: \n$msg"))
+                val arrows = if (uahEur.rateBuy > lastSentRate) "⬆️⬆️⬆️" else "⬇️⬇️⬇️"
+                execute(SendMessage(MY_CHAT_ID, "Significant rate change $arrows: \n$msg"))
                 lastSentRate = uahEur.rateBuy
             } else {
                 logInfo("No significant rate change. Not sending update.")
